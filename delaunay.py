@@ -1,70 +1,57 @@
 #!/usr/bin/python
  
 import cv2
+import sys
+import time
 import numpy as np
 import random
  
 # Check if a point is inside a rectangle
-def rect_contains(rect, point) :
-    if point[0] < rect[0] :
-        return False
-    elif point[1] < rect[1] :
-        return False
-    elif point[0] > rect[2] :
-        return False
-    elif point[1] > rect[3] :
-        return False
-    return True
+def rect_contains(rect, point):
+  if point[0] < rect[0] :
+    return False
+  elif point[1] < rect[1]:
+    return False
+  elif point[0] > rect[2]:
+    return False
+  elif point[1] > rect[3]:
+    return False
+  return True
  
 # Draw a point
 def draw_point(img, p, color ) :
     cv2.circle( img, p, 0, color, -1, cv2.LINE_AA, 0 )
  
+def trianglize(container):
+  triangles = []
+  for i in range(0, len(container)-6):
+    triangles.append([container[i],container[i+1],container[i+2]])
+  return triangles
  
+def avg_rgb(a,b,c):
+  return np.average((a,b,c),axis=0)
+
+
 # Draw delaunay triangles
-def draw_delaunay(img, subdiv, delaunay_color ) :
- 
-    triangleList = subdiv.getTriangleList();
-    size = img.shape
-    r = (0, 0, size[1], size[0])
- 
-    for t in triangleList :
-         
-        pt1 = (t[0], t[1])
-        pt2 = (t[2], t[3])
-        pt3 = (t[4], t[5])
-         
-        if rect_contains(r, pt1) and rect_contains(r, pt2) and rect_contains(r, pt3) :
-         
-            cv2.line(img, pt1, pt2, delaunay_color, 1, cv2.LINE_AA, 0)
-            cv2.line(img, pt2, pt3, delaunay_color, 1, cv2.LINE_AA, 0)
-            cv2.line(img, pt3, pt1, delaunay_color, 1, cv2.LINE_AA, 0)
- 
- 
-# Draw voronoi diagram
-def draw_voronoi(img, subdiv, colors) :
- 
-    ( facets, centers) = subdiv.getVoronoiFacetList([])
- 
-    for i in xrange(0,len(facets)) :
-        ifacet_arr = []
-        for f in facets[i] :
-            ifacet_arr.append(f)
-         
-        ifacet = np.array(ifacet_arr, np.int)
-        color = (colors[i][0], colors[i][1], colors[i][2])
- 
-        cv2.fillConvexPoly(img, ifacet, color, cv2.LINE_AA, 0);
-        ifacets = np.array([ifacet])
-        # cv2.polylines(img, ifacets, True, (0, 0, 0), 0, cv2.LINE_AA, 0)
-        cv2.circle(img, (centers[i][0], centers[i][1]), 0, (0, 0, 0), -1, cv2.LINE_AA, 0)
- 
+def draw_delaunay(img, points, colors):
+  trianglePoints = trianglize(points)
+  print(trianglePoints[0])
+  triangleColor = trianglize(colors)
+  size = img.shape
+  r = (0, 0, size[1], size[0])
+  for t,c in zip(trianglePoints,triangleColor):
+    if rect_contains(r, t[0]) and rect_contains(r, t[1]) and rect_contains(r, t[2]):
+      poly = np.array([t[0],t[1],t[2]], np.int)
+      cv2.fillConvexPoly(img, poly, avg_rgb(c[0],c[1],c[2]), cv2.LINE_AA, 0);
+      # cv2.line(img, pt1, pt2, delaunay_color, 1, cv2.LINE_AA, 0)
+      # cv2.line(img, pt2, pt3, delaunay_color, 1, cv2.LINE_AA, 0)
+      # cv2.line(img, pt3, pt1, delaunay_color, 1, cv2.LINE_AA, 0)
  
 if __name__ == '__main__':
  
+    start = time.time()
     # Define window names
     win_delaunay = "Delaunay Triangulation"
-    win_voronoi = "Voronoi Diagram"
  
     # Turn on animation while drawing triangles
     animate = False
@@ -72,12 +59,15 @@ if __name__ == '__main__':
     # Define colors for drawing.
     delaunay_color = (255,255,255)
     points_color = (0, 0, 255)
- 
-    # Read in the image.
-    img = cv2.imread("image.jpg");
+    try:
+      # Read in the image.
+      img = cv2.imread("image.jpg")
      
-    # Keep a copy around
-    img_orig = img.copy();
+      # Keep a copy around
+      img_orig = img.copy();
+    except AttributeError:
+      print("[ERROR] image.jpg file not found in root directory.")
+      sys.exit(0)
      
     # Rectangle to be used with Subdiv2D
     size = img.shape
@@ -85,47 +75,61 @@ if __name__ == '__main__':
      
     # Create an instance of Subdiv2D
     #        an empty Delaunay subdivision
-    subdiv = cv2.Subdiv2D(rect);
+    subdiv = cv2.Subdiv2D(rect)
  
     # Create an array of points.
-    points = [];
-    colors = [];
+    points = []
+    colors = []
      
     # Read in the points from a text file
-    with open("points.txt") as file :
+    try:
+      with open("points.txt") as file :
+        print("Reading coordinates ...")
         for line in file :
-            x, y, r, g, b = (line.split() + [None]*99)[:5]
-            points.append((int(x), int(y)))
-            colors.append((int(r), int(g), int(b)))
+          x, y, r, g, b = (line.split() + [None]*99)[:5]
+          points.append((int(x), int(y)))
+          colors.append((int(r), int(g), int(b)))
+        print("Done.")
+    except IOError:
+      print("points.txt file not found in root directory.")
+      sys.exit(0)
+    except TypeError:
+      print("points.txt might be invalid.")
+      print("x-coordinate] [y-coordinate] [red-value] [green-value] [blue-value]")
+      sys.exit(0)
  
     # Insert points into subdiv
+    print("Processing points ...")
     for p in points :
-        subdiv.insert(p)
-         
-        # Show animation
-        if animate :
-            img_copy = img_orig.copy()
-            # Draw delaunay triangles
-            draw_delaunay( img_copy, subdiv, (255, 255, 255) );
-            cv2.imshow(win_delaunay, img_copy)
-            cv2.waitKey(100)
+      subdiv.insert(p)
+      # Show animation
+      if animate :
+        img_copy = img_orig.copy()
+        # Draw delaunay triangles
+        draw_delaunay(img_copy, points, colors)
+        cv2.imshow(win_delaunay, img_copy)
+        cv2.waitKey(100)
+    print("Done.")
  
     # Draw delaunay triangles
-    draw_delaunay( img, subdiv, (255, 255, 255) );
+    print("Drawing dalaunay triangulation ...")
+    start_d = time.time()
+    draw_delaunay(img, points, colors)
  
     # Draw points
     for p in points :
-        draw_point(img, p, (0,0,255))
- 
-    # Allocate space for Voronoi Diagram
-    img_voronoi = np.zeros(img.shape, dtype = img.dtype)
- 
-    # Draw Voronoi diagram
-    draw_voronoi(img_voronoi,subdiv,colors)
+      draw_point(img, p, (0,0,255))
+    print("Done.")
  
     # Show results
-    cv2.imshow(win_delaunay,img)
+    print("Saving images ...")
     cv2.imwrite("delaunay.jpg",img)
-    cv2.imshow(win_voronoi,img_voronoi)
-    cv2.imwrite("voronoi.jpg",img_voronoi)
+    print("Done.")
+    print("(Press ESC to terminate.)")
+    end = time.time()
+    cv2.imshow(win_delaunay,img)
     cv2.waitKey(0)
+    print("============ Time ============")
+    print("global: " + str(end - start) + "seconds")
+    print("delaunay: " + str(end - start_d) + "seconds")
+    print("==============================")

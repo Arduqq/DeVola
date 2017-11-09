@@ -1,18 +1,26 @@
 # Image recovery using voronoi diagrams
 ## Usage
 ```
-python delaunay.py
+python sample.py -h
+Sample a given image using different sample methods. Right now you can sample using rectangular, equilateral, random and halton-based sampling methods. The output will be a text file looking like this:
 ```
-Put a random-sampled **image.jpg** and a **points.txt** in the same directory to start the calculation. The points.txt should have the following structure:
-```
 [x-coordinate] [y-coordinate] [red] [green] [blue]
 [x-coordinate] [y-coordinate] [red] [green] [blue]
 [x-coordinate] [y-coordinate] [red] [green] [blue]
 [x-coordinate] [y-coordinate] [red] [green] [blue]
 ```
+```
+python voronoi.py -h
+```
+Create a voronoi diagram using the sampled coordinates.
+
+```
+python fourier.py -h
+```
+Calculate the Fourier transform of the generated image.
+
 
 ## TODO
-- [ ] Better usage
+- [ ] Delaunay WIP!
 - [ ] quality assessement
 - [ ] statistics, metrics etc.
-- [ ] weird stuff happpens when closed
