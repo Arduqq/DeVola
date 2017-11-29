@@ -17,9 +17,7 @@ if __name__ == '__main__':
 
     if options.input:
       try:
-        # Read in the image.
         img = cv2.imread(options.input,0)
-        # Keep a copy around
         img_orig = img.copy();
       except AttributeError:
         print("[ERROR] .jpg file not found in root directory.")

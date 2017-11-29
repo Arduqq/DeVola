@@ -4,16 +4,13 @@ import cv2
 import sys
 import time
 import numpy as np
-import random
 from optparse import OptionParser
-from clint.textui import puts, colored, progress
+from matplotlib import pyplot as plt
 
-# Draw a point
-def draw_point(img, p, color):
-    cv2.circle( img, p, 0, color, -1, cv2.LINE_AA, 0 )
+def draw_blob(img, points, colors):
+  for p,c in zip(points,colors):
+    cv2.circle(img, p, 1, c, -1, cv2.LINE_AA, 0)
 
-
-# Draw voronoi diagram
 def draw_voronoi(img, subdiv, colors):
   (facets, centers) = subdiv.getVoronoiFacetList([])
  
@@ -29,7 +26,7 @@ def draw_voronoi(img, subdiv, colors):
     # cv2.polylines(img, ifacets, True, (0, 0, 0), 0, cv2.LINE_AA, 0)
     cv2.circle(img, (centers[i][0], centers[i][1]), 0, (0, 0, 0), -1, cv2.LINE_AA, 0)
  
- 
+
 if __name__ == '__main__':
     usage = "usage: %prog [options] arg"
     parser = OptionParser(usage)
@@ -37,17 +34,14 @@ if __name__ == '__main__':
     parser.add_option("-i", "--input",type="string", dest="input", help="import image to IMG", metavar="IMG_I")
     parser.add_option("-c", "--coords",type="string", dest="coords", help="import coordinates from .txt", metavar="TXT_I")
     parser.add_option("-o", "--output", type="string", dest="output", help="export diagram to specified file name", default='out.jpg')
-    parser.add_option("-s", "--silent", action="store_true", dest="silent", help="no windows")
     (options, args) = parser.parse_args()
 
     if options.input:
       try:
-        # Read in the image.
         img = cv2.imread(options.input)
-        # Keep a copy around
         img_orig = img.copy();
       except AttributeError:
-        puts("[" + colored.red("ERROR") + "] .jpg file not found in root directory.")
+        print("[ERROR] .jpg file not found in root directory.")
         sys.exit(0)
     if options.output:
       img_out = options.output
@@ -58,21 +52,17 @@ if __name__ == '__main__':
     else:
       coords = 'points.txt'
 
-
     start = time.time()
     # Define window names
-    win_voronoi = "Voronoi Diagram"
-
-    points_color = (0, 0, 255)
+    win_blob = "Splatfest"
     
+    size = img.shape
+    rect = (0, 0, size[1], size[0])
+    subdiv = cv2.Subdiv2D(rect)
      
     # Rectangle to be used with Subdiv2D
     size = img.shape
     rect = (0, 0, size[1], size[0])
-     
-    # Create an instance of Subdiv2D
-    #        an empty Delaunay subdivision
-    subdiv = cv2.Subdiv2D(rect)
     # Create an array of points.
     points = []
     colors = []
@@ -80,11 +70,12 @@ if __name__ == '__main__':
     # Read in the points from a text file
     try:
       with open(coords) as file :
-      	for i in progress.mill(range(100)):
-        	for line in file:
-          		x, y, r, g, b = (line.split() + [None]*99)[:5]
-          		points.append((int(x), int(y)))
-          		colors.append((int(r), int(g), int(b)))
+        print("Reading coordinates ...")
+        for line in file :
+          x, y, r, g, b = (line.split() + [None]*99)[:5]
+          points.append((int(x), int(y)))
+          colors.append((int(r), int(g), int(b)))
+        print("Done.")
     except IOError:
       print(".txt file not found in root directory.")
       sys.exit(0)
@@ -96,34 +87,45 @@ if __name__ == '__main__':
     animate = False
     # Insert points into subdiv
     print("Processing points ...")
-    img_voronoi = np.zeros(img.shape, dtype = img.dtype)
+    img_blob = np.zeros(img.shape, dtype = img.dtype)
     for p in points :
       subdiv.insert(p)
-      # Show animation
       if animate :
-        img_copy = img_voronoi.copy()
+        img_copy = img_blob.copy()
         # Draw delaunay triangles
-        draw_voronoi(img_copy, subdiv, colors)
-        cv2.imshow(win_voronoi, img_copy)
+        draw_blob(img_copy, points, colors)
+        cv2.imshow(win_blob, img_copy)
         cv2.waitKey(2)
     print("Done.")
 
+    smoothing = False
+    median = False
+    fastDenoise =False
+    shrink = False
     # Draw Voronoi diagram
-    print("Drawing voronoi diagram ...")
+    print("Starting splatfest ...")
     start_v = time.time()
-    draw_voronoi(img_voronoi,subdiv,colors)
+    draw_voronoi(img_blob,subdiv,colors)
+    draw_blob(img_blob,points,colors)
     print("Done.")
  
     # Show results
     print("Saving images ...")
-    cv2.imwrite(img_out,img_voronoi)
+    if smoothing:
+      img_blob = cv2.bilateralFilter(img_blob,9,75,75)
+    if fastDenoise:
+      img_blob = cv2.fastNlMeansDenoisingColored(img_blob,None,10,10,7,21)
+    if median:
+      img_blob = cv2.medianBlur(img_blob,21)
+    if shrink:
+      img_blob = cv2.resize(img_blob, (0,0), fx=0.5, fy=0.5, interpolation = cv2.INTER_AREA)
+    cv2.imwrite(img_out,img_blob)
     print("Done.")
     print("(Press ESC to terminate.)")
     end = time.time()
-    if not options.silent:
-      cv2.imshow(win_voronoi,img_voronoi)
-      cv2.waitKey(0)
-      print("============ Time ============")
-      print("total: " + str(end - start) + "seconds")
-      print("voronoi: " + str(end - start_v) + "seconds")
-      print("==============================")
+    # cv2.imshow(win_blob,img_blob)
+    # cv2.waitKey(0)
+    print("============ Time ============")
+    print("total: " + str(end - start) + "seconds")
+    print("splatting: " + str(end - start_v) + "seconds")
+    print("==============================")
