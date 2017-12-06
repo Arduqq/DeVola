@@ -6,6 +6,7 @@ import sys
 import time
 import numpy as np
 from math import ceil, sqrt
+from clint.textui import progress
 from fractions import gcd
 from random import randrange
 from optparse import OptionParser
@@ -25,20 +26,26 @@ def random_sample(img, samples, img_out):
     y = randrange(bound_y)
     points.append([y,x,img[x,y][0], img[x,y][1], img[x,y][2]])
     img_out[x,y] = img[x,y]
-  cv2.imwrite('out_random.jpg',img_out)
+  cv2.imwrite('samplings/' + str(samples) + '_random.jpg',img_out)
   return points
 
 def random_sample_unique(img, samples, img_out):
+  seen = set()
   size = img.shape
   bound_x, bound_y = int(size[0]), int(size[1])
   points = []
-  for i in range(0,samples):
-    x = randrange(bound_x)
-    y = randrange(bound_y)
-    if is_unique(x,y,points):
-      points.append([y,x,img[x,y][0], img[x,y][1], img[x,y][2]])
-      img_out[x,y] = img[x,y]
-  cv2.imwrite('out_randomu.jpg',img_out)
+  i = 0
+  with progress.Bar(label="random", expected_size=samples-1) as bar:
+    while len(points) != samples:
+      x = randrange(bound_x)
+      y = randrange(bound_y)
+      if (y,x,img[x,y][0], img[x,y][1], img[x,y][2]) not in seen:
+        seen.add((y,x,img[x,y][0], img[x,y][1], img[x,y][2]))
+        points.append([y,x,img[x,y][0], img[x,y][1], img[x,y][2]])
+        img_out[x,y] = img[x,y]
+        i += 1
+      bar.show(i)
+  cv2.imwrite('samplings/' + str(samples) + '_unique.jpg',img_out)
   return points
 
 def rectangular_sample(img, samples, img_out):
@@ -89,38 +96,43 @@ def equilateral_sample(img, samples, img_out):
       x += x_spacing
     off_row = not odd_row
     y += y_spacing
-  cv2.imwrite('out_equi.jpg',img_out)
+  cv2.imwrite('samplings/' + str(samples) + '_equi.jpg',img_out)
   return points
 
 
 def halton_sample(img, samples, img_out, p=2, q=3):
+  seen = set()
   size = img.shape
   points = []
-  i = 1
-  for i in range(1, samples+1):
-    fx = 1
-    fy = 1
-    ix = i
-    iy = i
-    rx = 0
-    ry = 0
-
-    # Calculate the ith p- and q-values
-    while ix > 0:
-      fx /= p
-      rx += fx * (ix % p)
-      ix = ix//p
-
-    while iy > 0:
-      fy /= q
-      ry += fy * (iy % q)
-      iy = iy//q
-    x = int(rx * size[0])
-    y = int(ry * size[1])
-    if is_unique(x,y,points):
-      points.append([y,x,img[x,y][0], img[x,y][1], img[x,y][2]])
-      img_out[x,y] = img[x,y]
-  cv2.imwrite('out_halton.jpg',img_out)
+  i = 0
+  with progress.Bar(label="halton", expected_size=samples) as bar:
+    for i in range(1, samples+1):
+      fx = 1
+      fy = 1
+      ix = i
+      iy = i
+      rx = 0
+      ry = 0
+  
+      # Calculate the ith p- and q-values
+      while ix > 0:
+        fx /= p
+        rx += fx * (ix % p)
+        ix = ix//p
+  
+      while iy > 0:
+        fy /= q
+        ry += fy * (iy % q)
+        iy = iy//q
+      x = int(rx * size[0])
+      y = int(ry * size[1])
+      if (y,x,img[x,y][0], img[x,y][1], img[x,y][2]) not in seen:
+        seen.add((y,x,img[x,y][0], img[x,y][1], img[x,y][2]))
+        points.append([y,x,img[x,y][0], img[x,y][1], img[x,y][2]])
+        img_out[x,y] = img[x,y]
+        i += 1
+      bar.show(i)
+  cv2.imwrite('samplings/' + str(samples) + '_halton.jpg',img_out)
   return points
 '''
   points.append([0, 0 ,img[0,0][0], img[0,0][1], img[0,0][2]])
@@ -143,33 +155,33 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     if options.input:
       img = cv2.imread(options.input)
-      win = "Voronoi Diagram"
+      name = options.input[:-4]
     if options.samples:
       samples = options.samples
     img_sample = np.zeros(img.shape, dtype = img.dtype)
     if options.random:
       points_r = random_sample(img, samples, img_sample)
-      output_r = open('random.txt', 'w')
+      output_r = open(name + '_random.txt', 'w')
       for item in points_r:
         output_r.write('{} {} {} {} {}\n'.format(*item))
     if options.randomu:
       points_ru = random_sample_unique(img, samples, img_sample)
-      output_ru = open('randomu.txt', 'w')
+      output_ru = open(name + '_unique.txt', 'w')
       for item in points_ru:
         output_ru.write('{} {} {} {} {}\n'.format(*item))
     if options.halton:
       points_h = halton_sample(img, samples, img_sample)
-      output_h = open('halton.txt', 'w')
+      output_h = open(name + '_halton.txt', 'w')
       for item in points_h:
         output_h.write('{} {} {} {} {}\n'.format(*item))
     if options.rectangular:
       points_re = rectangular_sample(img, samples, img_sample)
-      output_re = open('rect.txt', 'w')
+      output_re = open(name + '_rect.txt', 'w')
       for item in points_re:
         output_re.write('{} {} {} {} {}\n'.format(*item))
     if options.equilateral:
       points_e = equilateral_sample(img, samples, img_sample)
-      output_e = open('equi.txt', 'w')
+      output_e = open(name + '_equi.txt', 'w')
       for item in points_e:
         output_e.write('{} {} {} {} {}\n'.format(*item))
     
