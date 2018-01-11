@@ -1,4 +1,4 @@
 *.txt
 *.jpg
-samplings/*.jpg
-resources/*.jpg
+samplings
+resources

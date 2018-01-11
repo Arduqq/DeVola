@@ -1,31 +1,16 @@
 # Image recovery using voronoi diagrams
+## Functionality
+DeVola samples images using a pseudo-random halton sequence while saving the sampled data in a .txt-file. Based on the created samples, we can interpolate the image using Voronoi diagrams and Delaunay triangulation. Splatting is a very simple way of interpolating the image, yet salt-and-pepper-noise should be eliminiated by using the two algorithms as a base for the result. With different sizes and shrink-thresholds the splat sizes can vary to achieve simply beautiful images.
+
 ## Usage
 ```
-python sample.py -h
+python devola.py -h
 ```
-Sample a given image using different sample methods. Right now you can sample using rectangular, equilateral, random and halton-based sampling methods. The output will be a text file looking like this:
-> [x-coordinate] [y-coordinate] [red] [green] [blue]
-> [x-coordinate] [y-coordinate] [red] [green] [blue]
-> [x-coordinate] [y-coordinate] [red] [green] [blue]
-> [x-coordinate] [y-coordinate] [red] [green] [blue]
-```
-python voronoi.py -h
-```
-Create a voronoi diagram using the sampled coordinates.
-
-```
-python splat.py -h
-```
-Create the interpolation using voronoi and splatting.
-
-```
-python fourier.py -h
-```
-Calculate the Fourier transform of the generated image.
 
 
 ## TODO
-- [ ] Delaunay WIP!
+- [X] Delaunay WIP
+- [ ] Better Splat variation
 - [ ] quality assessement
 - [ ] statistics, metrics etc.
 - [ ] GUI
