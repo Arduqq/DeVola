@@ -31,8 +31,7 @@ if __name__ == '__main__':
     dft_shift = np.fft.fftshift(dft)
     magnitude_spectrum = 20*np.log(cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1]))
 
-    plt.imshow(magnitude_spectrum, cmap = 'gray')
-
-    plt.savefig(img_out, bbox_inches='tight')
-
+    plt.subplot(111),plt.imshow(magnitude_spectrum, cmap = 'gray')
+    plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
+    plt.show()
     cv2.waitKey(0)

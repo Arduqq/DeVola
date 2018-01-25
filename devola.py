@@ -9,6 +9,7 @@ import numpy as np
 from clint.textui import progress, puts, colored
 from optparse import OptionParser
 from matplotlib import pyplot as plt
+from fractions import gcd
 from math import ceil, sqrt
 from fractions import gcd
 from random import randrange
@@ -93,9 +94,9 @@ class InterpolationSet:
         c2 = (int(c2[0]),int(c2[1]),int(c2[2]))
         c3 = self.data[pt3]
         c3 = (int(c2[0]),int(c2[1]),int(c2[2]))
-        cv2.circle(img, pt1, 3, c1, -1, cv2.LINE_AA, 0)
-        cv2.circle(img, pt2, 3, c2, -1, cv2.LINE_AA, 0)
-        cv2.circle(img, pt3, 3, c3, -1, cv2.LINE_AA, 0)
+        cv2.circle(img, pt1, 1, c1, -1, cv2.LINE_AA, 0)
+        cv2.circle(img, pt2, 1, c2, -1, cv2.LINE_AA, 0)
+        cv2.circle(img, pt3, 1, c3, -1, cv2.LINE_AA, 0)
 
 
 class Sampler:
@@ -103,13 +104,13 @@ class Sampler:
   samples = []
   input_name = "image.jpg"
   img = cv2.imread(input_name)
-  img_out = np.zeros(img.shape, dtype=img.dtype)
-  size = img.shape
-  points = InterpolationSet([],size[1], size[0])
-  samplesize = (size[1]*size[0])/2
+  img_out = None
+  points = None
+  samplesize = None
+  current_sampling = None
 
 
-  def __init__(self, s, im, im_out):
+  def __init__(self, s, im):
 #    =============================
     self.samples = []
     self.samplesize = s
@@ -120,8 +121,9 @@ class Sampler:
     self.points = InterpolationSet([],size[1], size[0])
 
 # Random sampling algorithm using a pseudo-random halton sequence
-  def sample(self):
+  def halton(self):
 #     ============
+    self.current_sampling = "halton"
     p=2 
     q=3
     seen = set()
@@ -148,21 +150,62 @@ class Sampler:
         x = int(rx * size[0])
         y = int(ry * size[1])
         toAppend = ((y,x),(self.img[x,y][0], self.img[x,y][1], self.img[x,y][2]))
-        if (toAppend) not in seen:             # Adds calculated point if unique
-          seen.add((toAppend))
-          self.points.data[(y,x)] = toAppend[1]            # Appends point and color
-          self.img_out[x,y] = self.img[x,y]         # Visualize samples in image
-          i += 1
+        
+        self.points.data[(y,x)] = toAppend[1]            # Appends point and color
+        self.img_out[x,y] = self.img[x,y]         # Visualize samples in image
+        i += 1
         bar.show(i)
-    cv2.imwrite(self.input_name + str(self.samplesize)+'_halton.jpg',self.img_out)
+    cv2.imwrite(self.input_name[:-4] +'_halton.jpg',self.img_out)
 
-  def interpolate(self,out):
+  def grid(self):
+#     ==========
+    self.current_sampling = "grid"
+    size = self.img.shape
+    k = gcd(size[0],size[1])
+    reduced_x, reduced_y = size[0]/k, size[1]/k
+    aspect = reduced_x / reduced_y
+    count_x = ceil(sqrt(self.samplesize)*aspect)
+    count_y = ceil(sqrt(self.samplesize)/aspect)
+
+    x_spacing = int(max(ceil(size[0]/count_x), 1))
+    y_spacing = int(max(ceil(size[1]/count_y), 1))
+    i = 0
+    for y in range(0, size[1], y_spacing):
+      for x in range(0, size[0], x_spacing):
+        toAppend = ((y,x),(self.img[x,y][0], self.img[x,y][1], self.img[x,y][2]))
+        
+        self.points.data[(y,x)] = toAppend[1]        
+        self.img_out[x,y] = self.img[x,y]
+    cv2.imwrite(self.input_name[:-4] + '_grid.jpg',self.img_out)
+
+  def hexagonal(self):
+#     ==========
+    self.current_sampling = "hexagonal"
+    size = self.img.shape
+    k = gcd(size[0],size[1])
+    reduced_x, reduced_y = size[0]/k, size[1]/k
+    aspect = reduced_x / reduced_y
+    count_x = ceil(sqrt(self.samplesize)*aspect)
+    count_y = ceil(sqrt(self.samplesize)/aspect)
+
+    x_spacing = int(max(ceil(size[0]/count_x), 1))
+    y_spacing = int(max(ceil(size[1]/count_y), 1))
+    i = 0
+    for y in range(0, size[1], y_spacing):
+      for x in range(0, size[0], x_spacing):
+        toAppend = ((y,x),(self.img[x,y][0], self.img[x,y][1], self.img[x,y][2]))
+        
+        self.points.data[(y,x)] = toAppend[1]        
+        self.img_out[x,y] = self.img[x,y]
+    cv2.imwrite(self.input_name[:-4] + '_grid.jpg',self.img_out)
+
+  def interpolate(self):
 #     =====================
     self.points.initSubdiv()
     self.points.drawVoronoi(self.img)
-    cv2.imwrite("d.jpg",self.img)
+    cv2.imwrite(self.input_name[:-4] + "_" + sampler.current_sampling + "_voronoi.jpg",self.img)
     self.points.drawDelaunay(self.img)
-    cv2.imwrite("v.jpg",self.img)
+    cv2.imwrite(self.input_name[:-4] + "_" + sampler.current_sampling + "_delaunay.jpg",self.img)
 
   def __str__(self):
 #     =============
@@ -173,9 +216,10 @@ if __name__ == '__main__':
     usage = "usage: %prog [options] arg"
     parser = OptionParser(usage)
 
-    parser.add_option("-i", "--input", type="string", dest="input", help="import image to IMG", metavar="IMG_I")
+    parser.add_option("-i", "--input", type="string", dest="input", help="import image to IMG", metavar="IMG_I", default = 'image.jpg')
     parser.add_option("-s", "--samples", type="int", dest="samples", help="amount of sampled pixels from IMG", default=1000)
-    parser.add_option("-o", "--output", type="string", dest="output", help="export diagram to specified file name", default='out.jpg')
+    parser.add_option("-H", "--halton", action="store_true", dest="halton", help="use halton sampling")
+    parser.add_option("-G", "--grid", action="store_true", dest="grid", help="use grid sampling")
     (options, args) = parser.parse_args()
 
     if options.input:
@@ -184,24 +228,34 @@ if __name__ == '__main__':
       except AttributeError:
         puts(colored.red("[ERROR] .jpg file not found in root directory."))
         sys.exit(0)
-    if options.output:
-      img_out = options.output
-    else:
-      img_out = "out.jpg"
     if options.samples:
       samples = options.samples
     
     os.system('clear')
     puts("Initializing " + colored.red("DeVola"))
     puts(colored.red("De")+"launay-"+colored.red("Vo")+"ronoi-Sp"+colored.red("la")+"tting")
-    sampler = Sampler(samples, img, img_out)
+    sampler = Sampler(samples, img)
     puts(colored.green("[SUCCESS] Initialized image"))
     print(sampler)
-    sampler.sample()
-    puts(colored.green("[SUCCESS] Sampled image using halton sampling"))
-    sampler.points.save()
-    puts(colored.green("[SUCCESS] Saved coordinates in " + \
-      colored.blue(str(sampler.samplesize) + "_halton.txt")))
-    sampler.interpolate(img_out)
-    puts(colored.green("[SUCCESS] Interpolation successfull"))
-    puts(colored.green("[SUCCESS] Saved as ") + colored.blue(img_out))
+
+    if options.grid:
+      sampler.grid()
+      puts(colored.green("[SUCCESS] Sampling successfull"))
+      sampler.points.save()
+      puts(colored.green("[SUCCESS] Saved coordinates in " + \
+        colored.blue(str(sampler.input_name[:-4]) + "_" + sampler.current_sampling + ".txt")))
+      sampler.interpolate()
+      puts(colored.green("[SUCCESS] Interpolation successfull"))
+      puts(colored.green("[SUCCESS] Saved images in " + \
+        colored.blue(str(sampler.input_name[:-4]) + "_" + sampler.current_sampling + "_(voronoi|delaunay).txt")))
+
+    if options.halton:
+      sampler.halton()
+      puts(colored.green("[SUCCESS] Sampling successfull"))
+      sampler.points.save()
+      puts(colored.green("[SUCCESS] Saved coordinates in " + \
+        colored.blue(str(sampler.input_name[:-4]) + "_" + sampler.current_sampling + ".txt")))
+      sampler.interpolate()
+      puts(colored.green("[SUCCESS] Interpolation successfull"))
+      puts(colored.green("[SUCCESS] Saved images in " + \
+        colored.blue(str(sampler.input_name[:-4]) + "_" + sampler.current_sampling + "_(voronoi|delaunay).txt")))
